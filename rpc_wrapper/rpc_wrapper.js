@@ -52,7 +52,7 @@ async function readMerkleRoot (contract) {
 }
 
 
-async function readAllEvents (contract, firstBlockNumberInData) {
+async function readEvents (contract, firstBlockNumberInData) {
     const fromBlock = 0;
     const toBlock = 'latest';
     const events = await contract.queryFilter({}, fromBlock, toBlock);
@@ -126,7 +126,7 @@ module.exports = {
     readMerkleRoot,
     createContract,
     createProvider,
-    readAllEvents,
+    readEvents,
     readCidDataFormat,
     getBlockTimestamp
 };

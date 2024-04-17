@@ -1,10 +1,10 @@
 require('dotenv').config({ path: `${__dirname}/.env` });
-const { createContract, readSensor, readMerkleRoot, readAllEvents, readCidDataFormat, getBlockTimestamp } = require("./rpc_wrapper/rpc_wrapper")
+const { createContract, readSensor, readMerkleRoot, readCidDataFormat, getBlockTimestamp } = require("./rpc_wrapper/rpc_wrapper")
 const { getAllData } = require("./data_fetcher/data_fetcher");
 const { checkBlockNumbers, recoverAddressFromData, checkSignatures, checkMerkleRoot, checkEventOrder, checkTimestamps } = require("./data_verifier/data_verifier");
 const { createCid, fetchDataFromIpfs, fillTemplateWithData, generateBufferForIpfs, storeBlobToIPFS } = require("./ipfs/ipfs");
 const { createMerkleTree } = require('./merkle_tree/merkle_tree.js');
-const { genDataEntries, assignDataToEvents, assignSensorAndCidDataFormatToEvents } = require('./data_preprocessing/data_preprocessor');
+const { organizeEventData, dataToEntriesObjects, assignDataToEvents } = require('./data_preprocessing/data_preprocessor');
 const { reportAfterSignatureCheck, reportIncorrectLeaves, reportProtocolFidelity } = require('./result_reporter/result_reporter.js');
 
 
@@ -20,28 +20,26 @@ const general = {
 
 async function verifyIntegrity (data, rpcKey=process.env.RPC_KEY) {
     if (data && data.length !== 0) {
+
         general.providerURL = general.providerURL + rpcKey
         const firstBlockNumberInData = data[0][0]
         const contract = createContract(general)
 
         try {
-            console.log("Lese Events und ordne Daten zu...\n")
-            const events = await readAllEvents(contract, firstBlockNumberInData)
-            let dataEntries = await genDataEntries(data)
-            let requestAndUpdateEventsAndRemovedEvents = await assignDataToEvents([...dataEntries], events, general.providerURL)
-            let requestAndUpdateEvents = requestAndUpdateEventsAndRemovedEvents.requestAndUpdateEvents;
-            let removedUpdatedEvents = requestAndUpdateEventsAndRemovedEvents.removedUpdatedEvents;
+            console.log("\nLese Events...")
 
-            if (removedUpdatedEvents.length != 0){
-                console.log("Achtung. Folgende MerkleRootUpdated Events, die sich auf dasselbe MerkleRootRequested Event beziehen, wurden gefunden und entfernt:\n");
-                console.log(removedUpdatedEvents);
-                console.log("\n")
-            }
+            let requestAndUpdateEvents = await organizeEventData(contract, firstBlockNumberInData, general)
 
-            assignSensorAndCidDataFormatToEvents(requestAndUpdateEvents, events)
+
+            console.log("\nOrdne den Events Daten zu...");
+            const dataEntries = await dataToEntriesObjects(data)
+            await assignDataToEvents([...dataEntries], requestAndUpdateEvents)
+
+
+
 
             // Überprüfungen
-            console.log("\nStarte Überprüfungen:\nChecke Signaturen...")
+            console.log("\nStarte Überprüfungen:\n\nChecke Signaturen...")
             await checkSignatures(requestAndUpdateEvents)
             if (reportAfterSignatureCheck(requestAndUpdateEvents)) {
                 console.log("Signaturen korrekt. Führe Überprüfung fort.")
@@ -72,11 +70,13 @@ async function verifyIntegrity (data, rpcKey=process.env.RPC_KEY) {
 
             return reportProtocolFidelity(requestAndUpdateEvents)
         } catch (error) {
+            console.log("Folgender Fehler ist in dem Prozess der Verifizierung aufgetreten:\n");
             console.log(error.message)
+            console.log("\nVerifikation konnte nicht weiter fortgeführt werden.")
         }
 
     } else {
-        console.log("Data is missing.");
+        console.log("Keine Daten erhalten. Verifikation kann nicht durchgeführt werden.");
         return false;
     }
 }

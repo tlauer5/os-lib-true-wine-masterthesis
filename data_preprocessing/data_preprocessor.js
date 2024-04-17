@@ -1,62 +1,99 @@
-const { getBlockTimestamp } = require('../rpc_wrapper/rpc_wrapper');
+const { getBlockTimestamp, readEvents } = require('../rpc_wrapper/rpc_wrapper');
 const { fetchDataFromIpfs } = require('../ipfs/ipfs');
 
 
-async function genDataEntries (data) {
-    let dataEntries = []
+async function organizeEventData (contract, firstBlockNumberInData, general) {
+    const events = await readEvents(contract, firstBlockNumberInData)
 
-    for (dataEntry of data) {
+    const MRReqEvents = await eventsToMReqObjects(events, general.providerURL);
 
-        let tempObject = {
-            "blockNumber": dataEntry[0],
-            "timestamp": dataEntry[1],
-            "temperature": dataEntry[2],
-            "humidity": dataEntry[3],
-            "signature": dataEntry[4],
-        };
+    let MRUpdEvents = await eventsToMRUpdObjects(events)
 
-        dataEntries.push(tempObject)
+    let removedEvents = removeDoubleMRUpdEvents(MRUpdEvents)
+
+    if (removedEvents.length != 0) {
+        console.log("\nAchtung. Folgende MerkleRootUpdated Events, die sich auf dasselbe MerkleRootRequested Event beziehen, wurden gefunden und entfernt:\n");
+        console.log(removedEvents);
+        console.log("\n")
     }
 
-    return dataEntries;
+    let requestAndUpdateEvents = [...MRReqEvents, ...MRUpdEvents];
+
+    requestAndUpdateEvents = requestAndUpdateEvents.sort((a, b) => a.blockNumber - b.blockNumber);
+
+    assignSensorAndCidDataFormatToEvents(requestAndUpdateEvents, events)
+
+    return requestAndUpdateEvents
 }
 
 
-async function assignDataToEvents (dataEntries, events, providerURL) {
-    let requestAndUpdateEventsAndRemovedEvents = await createRequestAndUpdateEventList(events, providerURL);
+async function eventsToMReqObjects (events, providerURL) {
+    let MRReqEvents = [...events.merkleRootRequestedEvents]
+    let MRReqObjects = []
 
-    for (i = dataEntries.length - 1; i >= 0; i--) {
-        let tempObject = requestAndUpdateEventsAndRemovedEvents.requestAndUpdateEvents.find(event => (
-            event.type == "MerkleRootUpdated" &&
-            (event.blockNumberLeaf == dataEntries[i].blockNumber))
-        )
+    for (blockNumber of MRReqEvents) {
+        MRReqObjects.push(
+            {
+                "type": "MerkleRootRequested",
+                "blockNumber": blockNumber,
+                "eventOrderCheck": false,
+                "blockTimeStamp": await getBlockTimestamp(blockNumber, providerURL),
+            })
 
-        if (tempObject) {
-            tempObject.dataInDatabase = true;
-            tempObject.dataFromDatabase = dataEntries[i]
-            dataEntries.splice(i, 1)
+    }
+
+    return MRReqObjects;
+}
+
+
+async function eventsToMRUpdObjects (events) {
+    let MRUpdEvents = []
+
+    for (const [blockNumber, values] of events.merkleRootUpdatedEvents) {
+        MRUpdEvents.push({
+            "type": "MerkleRootUpdated",
+            "blockNumber": blockNumber,
+            "blockNumberLeaf": await readBlockNumberFromLeaf(values.leaf),
+            "leafUpdateEvent": values.leaf,
+            "merkleRootUpdateEvent": values.merkleRoot,
+            "dataInDatabase": false,
+            "signatureCheck": false,
+            "merkleRootCheck": false,
+            "blockNumberCheck": false,
+            "timestampCheck": false
+        });
+    }
+
+    return MRUpdEvents;
+}
+
+
+async function readBlockNumberFromLeaf (leaf) {
+    const data = await fetchDataFromIpfs(leaf);
+
+    return data.blockNumber
+}
+
+
+function removeDoubleMRUpdEvents (MRUpdEvents) {
+    let removedEvents = [];
+    let temp = {};
+
+    MRUpdEvents.forEach(event => {
+        let key = event.blockNumberLeaf;
+        if (!temp[key] || temp[key].blockNumber < event.blockNumber) {
+            if (temp[key]) {
+                removedEvents.push(temp[key]);
+            }
+            temp[key] = event;
+        } else {
+            removedEvents.push(event);
         }
-    }
+    });
 
-    if (dataEntries.length != 0) {
-        throw new Error(`Es gibt in der Datenbank folgende Einträge deren Blocknummern mit keiner Blocknummer aus den Events übereinstimmen: ${JSON.stringify(dataEntries)}`)
-    }
+    MRUpdEvents = Object.values(temp);
 
-    return {
-        requestAndUpdateEvents: requestAndUpdateEventsAndRemovedEvents.requestAndUpdateEvents,
-        removedUpdatedEvents: requestAndUpdateEventsAndRemovedEvents.removedUpdatedEvents
-    }
-}
-
-
-function findClosestSmallerNumber (blockNumber, numbers) {
-    const smallerNumbers = numbers.filter(number => number < blockNumber);
-
-    if (smallerNumbers.length > 0) {
-        return smallerNumbers.sort((a, b) => b - a)[0];
-    } else {
-        throw new Error(`Keine korrespondierende Event-Blocknummer (CidDataFormatUpdated oder SensorAddressUpdated) für das MerkleRootUpdated Event mit der Blocknummer ${blockNumber} gefunden.`);
-    }
+    return removedEvents
 }
 
 
@@ -79,92 +116,59 @@ function assignSensorAndCidDataFormatToEvents (requestAndUpdateEvents, events) {
 }
 
 
-async function createRequestAndUpdateEventList (events, providerURL) {
-    let requestEvents = await createListOfMRReqEvents(events, providerURL);
+function findClosestSmallerNumber (blockNumber, numbers) {
+    const smallerNumbers = numbers.filter(number => number < blockNumber);
 
-    let updateEventsAndRemovedEvents = await createListOfMRUpdEvents(events)
-
-    let requestAndUpdateEvents = [...requestEvents, ...updateEventsAndRemovedEvents.MRUpdEvents];
-
-    requestAndUpdateEvents = requestAndUpdateEvents.sort((a, b) => a.blockNumber - b.blockNumber);
-
-    return {
-        requestAndUpdateEvents: requestAndUpdateEvents,
-        removedUpdatedEvents: updateEventsAndRemovedEvents.removedEvents
-    };
+    if (smallerNumbers.length > 0) {
+        return smallerNumbers.sort((a, b) => b - a)[0];
+    } else {
+        throw new Error(`Keine korrespondierende Event-Blocknummer (CidDataFormatUpdated oder SensorAddressUpdated) für das MerkleRootUpdated Event mit der Blocknummer ${blockNumber} gefunden.`);
+    }
 }
 
 
-async function createListOfMRReqEvents (events, providerURL) {
-    let MRReqEvents = [...events.merkleRootRequestedEvents]
-    let MRReqObjects = []
+async function dataToEntriesObjects (data) {
+    let dataEntries = []
 
-    for (blockNumber of MRReqEvents) {
-        MRReqObjects.push(
-            {
-                "type": "MerkleRootRequested",
-                "blockNumber": blockNumber,
-                "eventOrderCheck": false,
-                "blockTimeStamp": await getBlockTimestamp(blockNumber, providerURL),
-            })
+    for (dataEntry of data) {
 
+        let tempObject = {
+            "blockNumber": dataEntry[0],
+            "timestamp": dataEntry[1],
+            "temperature": dataEntry[2],
+            "humidity": dataEntry[3],
+            "signature": dataEntry[4],
+        };
+
+        dataEntries.push(tempObject)
     }
 
-    return MRReqObjects;
+    return dataEntries;
 }
 
 
-async function createListOfMRUpdEvents (events) {
-    let MRUpdEvents = []
+async function assignDataToEvents (dataEntries, requestAndUpdateEvents) {
+    for (i = dataEntries.length - 1; i >= 0; i--) {
+        let tempObject = requestAndUpdateEvents.find(event => (
+            event.type == "MerkleRootUpdated" &&
+            (event.blockNumberLeaf == dataEntries[i].blockNumber))
+        )
 
-    for (const [blockNumber, values] of events.merkleRootUpdatedEvents) {
-        MRUpdEvents.push({
-            "type": "MerkleRootUpdated",
-            "blockNumber": blockNumber,
-            "blockNumberLeaf": await readBlockNumberFromLeaf(values.leaf),
-            "leafUpdateEvent": values.leaf,
-            "merkleRootUpdateEvent": values.merkleRoot,
-            "dataInDatabase": false,
-            "signatureCheck": false,
-            "merkleRootCheck": false,
-            "blockNumberCheck": false,
-            "timestampCheck": false
-        });
-    }
-
-    let removedEvents = [];
-    let temp = {};
-
-    MRUpdEvents.forEach(event => {
-        let key = event.blockNumberLeaf;
-        if (!temp[key] || temp[key].blockNumber < event.blockNumber) {
-            if (temp[key]) {
-                removedEvents.push(temp[key]);
-            }
-            temp[key] = event;
-        } else {
-            removedEvents.push(event);
+        if (tempObject) {
+            tempObject.dataInDatabase = true;
+            tempObject.dataFromDatabase = dataEntries[i]
+            dataEntries.splice(i, 1)
         }
-    });
-
-    MRUpdEvents = Object.values(temp);
-
-    return {
-        MRUpdEvents: MRUpdEvents,
-        removedEvents: removedEvents
     }
-}
 
-
-async function readBlockNumberFromLeaf(leaf) {
-    const data = await fetchDataFromIpfs(leaf);
-
-    return data.blockNumber
+    if (dataEntries.length != 0) {
+        throw new Error(`Es gibt in der Datenbank folgende Einträge deren Blocknummern mit keiner Blocknummer aus den Events übereinstimmen: ${JSON.stringify(dataEntries)}`)
+    }
 }
 
 
 module.exports = {
-    genDataEntries,
-    assignDataToEvents,
-    assignSensorAndCidDataFormatToEvents
+    organizeEventData,
+    dataToEntriesObjects,
+    assignDataToEvents
 };
