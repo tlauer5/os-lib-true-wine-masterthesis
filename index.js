@@ -1,5 +1,5 @@
 require('dotenv').config({ path: `${__dirname}/.env` });
-const { createContract, readSensor, readMerkleRoot, readAllEvents, readCidDataFormat, getBlockTimestamp } = require("./blockchain/blockchain")
+const { createContract, readSensor, readMerkleRoot, readAllEvents, readCidDataFormat, getBlockTimestamp } = require("./rpc_wrapper/rpc_wrapper")
 const { getAllData } = require("./data_fetcher/data_fetcher");
 const { checkBlockNumbers, recoverAddressFromData, checkSignatures, checkMerkleRoot, checkEventOrder, checkTimestamps } = require("./data_verifier/data_verifier");
 const { createCid, fetchDataFromIpfs, fillTemplateWithData, generateBufferForIpfs, storeBlobToIPFS } = require("./ipfs/ipfs");
@@ -14,7 +14,7 @@ const general = {
     chainId: process.env.CHAIN_ID,
     contractAddress: process.env.CONTRACT_ADDRESS,
     providerURL: process.env.PROVIDER_URL,
-    abi: require("./blockchain/abi/abi.json")
+    abi: require("./rpc_wrapper/abi/abi.json")
 };
 
 

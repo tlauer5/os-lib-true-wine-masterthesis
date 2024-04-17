@@ -1,4 +1,4 @@
-const { getBlockTimestamp } = require('../blockchain/blockchain');
+const { getBlockTimestamp } = require('../rpc_wrapper/rpc_wrapper');
 const { fetchDataFromIpfs } = require('../ipfs/ipfs');
 
 

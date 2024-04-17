@@ -1,5 +1,5 @@
 const Web3 = require('web3');
-const { readMerkleRoot } = require('../blockchain/blockchain');
+const { readMerkleRoot } = require('../rpc_wrapper/rpc_wrapper');
 const { generateLeaf } = require('../ipfs/ipfs.js');
 const { createMerkleTree } = require('../merkle_tree/merkle_tree.js');
 
