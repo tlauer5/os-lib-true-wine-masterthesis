@@ -1,6 +1,6 @@
 const Web3 = require('web3');
-const { readMerkleRoot } = require('../rpc_wrapper/rpc_wrapper');
 const { generateLeaf } = require('../ipfs/ipfs.js');
+const { readMerkleRoot } = require('../rpc_wrapper/rpc_wrapper');
 const { createMerkleTree } = require('../merkle_tree/merkle_tree.js');
 
 
@@ -36,18 +36,18 @@ async function checkMerkleRoot (requestAndUpdateEvents, general, contract) {
             leafs.push(tempLeaf)
             updEvent.generatedLeaf = tempLeaf[1]
 
-            if(updEvent.generatedLeaf === updEvent.leafUpdateEvent) {
+            if (updEvent.generatedLeaf === updEvent.leafUpdateEvent) {
                 updEvent.merkleRootCheck = true;
             }
         }
     }
 
     const merkleRootFromSmartContract = await readMerkleRoot(contract)
-    console.log("Merkle Root von Smart Contract: " + merkleRootFromSmartContract);
+    console.log("Merkle Root von Smart Contract:\n-> " + merkleRootFromSmartContract + " <-\n");
 
     const merkleTree = createMerkleTree(leafs)
     const merkleRootFromData = merkleTree.root
-    console.log("Neu generierte Merkle Root mit Daten von Datenbank: " + merkleRootFromData)
+    console.log("Neu generierte Merkle Root mit Daten von Datenbank:\n-> " + merkleRootFromData + " <-\n")
 
     if (merkleRootFromData == merkleRootFromSmartContract) {
         return true
@@ -119,11 +119,10 @@ function checkTimestamps (requestAndUpdateEvents) {
 
 
 module.exports = {
-    recoverAddressFromData,
     checkSignatures,
+    recoverAddressFromData,
     checkMerkleRoot,
     checkEventOrder,
     checkBlockNumbers,
-    checkTimestamps,
-
+    checkTimestamps
 };

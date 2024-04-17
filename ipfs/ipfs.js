@@ -12,38 +12,14 @@ async function generateLeaf (cidDataFormat, general, data) {
 }
 
 
-async function storeBlobToIPFS (blobData, apiKey) {
-  try {
-    const response = await axios.post("https://api.nft.storage/upload", blobData, {
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
-      }
-    });
+async function generateBufferForIpfs (dataTemplateCid, general, data) {
+  const template = await fetchDataFromIpfs(dataTemplateCid);
 
-    const cid = response.data.value.cid;
-    console.log('Blob stored successfully. CID:', cid);
-  } catch (error) {
-    console.error('Error storing Blob:', error);
-  }
-}
+  filledTemplate = fillTemplateWithData(template, general, data);
 
+  const formattedJson = JSON.stringify(filledTemplate, null, 2);
 
-async function createCid (buffer, cidDataFormat) {
-  const { multihashAlgorithm, version, multicodec } = cidDataFormat;
-
-  const hash = await multihashing(buffer, multihashAlgorithm);
-
-  const cid = new CID(getCidVersion(version), multicodec, hash);
-
-  const cidString = cid.toString()//cid.toBaseEncodedString('base32');
-
-  return cidString
-}
-
-
-function getCidVersion (version) {
-  return parseInt(version[version.length - 1], 10);
+  return Buffer.from(formattedJson);
 }
 
 
@@ -60,7 +36,6 @@ async function fetchDataFromIpfs (cid) {
   } catch (error) {
     throw new Error("Daten konnten nicht von IPFS eingeholt werden.")
   }
-
 }
 
 
@@ -82,14 +57,38 @@ function fillTemplateWithData (template, general, data) {
 }
 
 
-async function generateBufferForIpfs (dataTemplateCid, general, data) {
-  const template = await fetchDataFromIpfs(dataTemplateCid);
+async function createCid (buffer, cidDataFormat) {
+  const { multihashAlgorithm, version, multicodec } = cidDataFormat;
 
-  filledTemplate = fillTemplateWithData(template, general, data);
+  const hash = await multihashing(buffer, multihashAlgorithm);
 
-  const formattedJson = JSON.stringify(filledTemplate, null, 2);
+  const cid = new CID(getCidVersion(version), multicodec, hash);
 
-  return Buffer.from(formattedJson);
+  const cidString = cid.toString()//cid.toBaseEncodedString('base32');
+
+  return cidString
+}
+
+
+function getCidVersion (version) {
+  return parseInt(version[version.length - 1], 10);
+}
+
+
+async function storeBlobToIPFS (blobData, apiKey) {
+  try {
+    const response = await axios.post("https://api.nft.storage/upload", blobData, {
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      }
+    });
+
+    const cid = response.data.value.cid;
+    console.log('Blob stored successfully. CID:', cid);
+  } catch (error) {
+    console.error('Error storing Blob:', error);
+  }
 }
 
 

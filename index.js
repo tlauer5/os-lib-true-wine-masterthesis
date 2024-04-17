@@ -1,11 +1,11 @@
 require('dotenv').config({ path: `${__dirname}/.env` });
-const { createContract, readSensor, readMerkleRoot, readCidDataFormat, getBlockTimestamp } = require("./rpc_wrapper/rpc_wrapper")
 const { getAllData } = require("./data_fetcher/data_fetcher");
-const { checkBlockNumbers, recoverAddressFromData, checkSignatures, checkMerkleRoot, checkEventOrder, checkTimestamps } = require("./data_verifier/data_verifier");
+const { createContract, readSensor, readMerkleRoot, readCidDataFormat, getBlockTimestamp } = require("./rpc_wrapper/rpc_wrapper")
+const { organizeEventData, dataToEntriesObjects, assignDataToEvents } = require('./data_preprocessing/data_preprocessor');
+const { checkSignatures, checkMerkleRoot, checkEventOrder, checkBlockNumbers, checkTimestamps, recoverAddressFromData } = require("./data_verifier/data_verifier");
+const { reportAfterSignatureCheck, reportIncorrectLeaves, reportProtocolFidelity } = require('./result_reporter/result_reporter.js');
 const { createCid, fetchDataFromIpfs, fillTemplateWithData, generateBufferForIpfs, storeBlobToIPFS } = require("./ipfs/ipfs");
 const { createMerkleTree } = require('./merkle_tree/merkle_tree.js');
-const { organizeEventData, dataToEntriesObjects, assignDataToEvents } = require('./data_preprocessing/data_preprocessor');
-const { reportAfterSignatureCheck, reportIncorrectLeaves, reportProtocolFidelity } = require('./result_reporter/result_reporter.js');
 
 
 const general = {
@@ -18,7 +18,12 @@ const general = {
 };
 
 
-async function verifyIntegrity (data, rpcKey=process.env.RPC_KEY) {
+async function dataFromWebsite (apiUrl = process.env.DEFAULT_DATA_API_URL) {
+    return getAllData(apiUrl);
+}
+
+
+async function verifyIntegrity (data, rpcKey = process.env.RPC_KEY) {
     if (data && data.length !== 0) {
 
         general.providerURL = general.providerURL + rpcKey
@@ -26,20 +31,16 @@ async function verifyIntegrity (data, rpcKey=process.env.RPC_KEY) {
         const contract = createContract(general)
 
         try {
-            console.log("\nLese Events...")
-
+            // Preprozessierung von Events und Daten
+            console.log("\nLese Events (das Abfragen der Zeitstempel dauert etwas länger)...")
             let requestAndUpdateEvents = await organizeEventData(contract, firstBlockNumberInData, general)
 
-
-            console.log("\nOrdne den Events Daten zu...");
+            console.log("\nOrdne Events Daten zu...");
             const dataEntries = await dataToEntriesObjects(data)
             await assignDataToEvents([...dataEntries], requestAndUpdateEvents)
 
-
-
-
             // Überprüfungen
-            console.log("\nStarte Überprüfungen:\n\nChecke Signaturen...")
+            console.log("\n-------------\nStarte Überprüfungen:\nChecke Signaturen...")
             await checkSignatures(requestAndUpdateEvents)
             if (reportAfterSignatureCheck(requestAndUpdateEvents)) {
                 console.log("Signaturen korrekt. Führe Überprüfung fort.")
@@ -48,7 +49,7 @@ async function verifyIntegrity (data, rpcKey=process.env.RPC_KEY) {
                 return false;
             }
 
-            console.log("\nChecke Merkle Root...");
+            console.log("\n-------------\nChecke Merkle Root...");
             const merkleRootCheckPassed = await checkMerkleRoot(requestAndUpdateEvents, general, contract)
 
             if (merkleRootCheckPassed) {
@@ -58,8 +59,7 @@ async function verifyIntegrity (data, rpcKey=process.env.RPC_KEY) {
                 return false;
             }
 
-
-            console.log("\nChecke Eventreihenfolge...")
+            console.log("\n-------------\nChecke Eventreihenfolge...")
             checkEventOrder(requestAndUpdateEvents)
 
             console.log("\nChecke Blocknummern...")
@@ -82,30 +82,19 @@ async function verifyIntegrity (data, rpcKey=process.env.RPC_KEY) {
 }
 
 
-async function dataFromWebsite (apiUrl = process.env.DEFAULT_DATA_API_URL) {
-    return getAllData(apiUrl);
-}
-
-
-async function graphForData (data) {
-    await plotData(data);
-}
-
-
 module.exports = {
-    verifyIntegrity,
     dataFromWebsite,
-    graphForData,
-    createMerkleTree,
+    verifyIntegrity,
+    createContract,
+    readSensor,
+    readMerkleRoot,
+    readCidDataFormat,
+    getBlockTimestamp,
     recoverAddressFromData,
     createCid,
     fetchDataFromIpfs,
     fillTemplateWithData,
     generateBufferForIpfs,
     storeBlobToIPFS,
-    readSensor,
-    readMerkleRoot,
-    readCidDataFormat,
-    createContract,
-    getBlockTimestamp
+    createMerkleTree
 }
