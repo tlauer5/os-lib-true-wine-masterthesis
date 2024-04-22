@@ -28,7 +28,7 @@ async function verifyIntegrity (data, rpcKey = process.env.RPC_KEY) {
 
         general.providerURL = general.providerURL + rpcKey
         const firstBlockNumberInData = data[0][0]
-        const contract = createContract(general)
+        const contract = createContract(general.providerURL, general.contractAddress, general.abi)
 
         try {
             // Preprozessierung von Events und Daten

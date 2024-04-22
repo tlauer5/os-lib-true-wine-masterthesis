@@ -1,10 +1,10 @@
 const { ethers } = require("ethers")
 
 
-function createContract (general) {
-    const provider = createProvider(general.providerURL)
+function createContract (providerURL, contractAddress, abi) {
+    const provider = createProvider(providerURL)
 
-    return new ethers.Contract(general.contractAddress, general.abi, provider);
+    return new ethers.Contract(contractAddress, abi, provider);
 }
 
 
