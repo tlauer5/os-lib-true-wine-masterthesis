@@ -43,11 +43,11 @@ async function checkMerkleRoot (requestAndUpdateEvents, general, contract) {
     }
 
     const merkleRootFromSmartContract = await readMerkleRoot(contract)
-    console.log("Merkle Root von Smart Contract:\n-> " + merkleRootFromSmartContract + " <-\n");
+    console.log("Merkle Root from Smart Contract:\n-> " + merkleRootFromSmartContract + " <-\n");
 
     const merkleTree = createMerkleTree(leafs)
     const merkleRootFromData = merkleTree.root
-    console.log("Neu generierte Merkle Root mit Daten von Datenbank:\n-> " + merkleRootFromData + " <-\n")
+    console.log("Newly generated Merkle Root with data from database:\n-> " + merkleRootFromData + " <-\n")
 
     if (merkleRootFromData == merkleRootFromSmartContract) {
         return true
@@ -62,9 +62,9 @@ function checkEventOrder (requestAndUpdateEvents) {
         let event = requestAndUpdateEvents[i];
         if (event.type === 'MerkleRootRequested') {
 
-            // Wenn das nächste Ereignis existiert und vom Typ MerkleRootUpdated ist
+            // If the next event exists and is of type MerkleRootUpdated
             if (i + 1 < requestAndUpdateEvents.length && requestAndUpdateEvents[i + 1].type === 'MerkleRootUpdated') {
-                // Prüfen, ob das MerkleRootUpdated-Ereignis sich auf das aktuelle MerkleRootRequested-Ereignis bezieht
+                // Check whether the MerkleRootUpdated event refers to the current MerkleRootRequested event
                 if (requestAndUpdateEvents[i + 1].blockNumberLeaf === event.blockNumber) {
                     event.eventOrderCheck = true;
 

@@ -12,7 +12,7 @@ async function organizeEventData (contract, firstBlockNumberInData, general) {
     let removedEvents = removeDoubleMRUpdEvents(MRUpdEvents)
 
     if (removedEvents.length != 0) {
-        console.log("\nAchtung. Folgende MerkleRootUpdated Events, die sich auf dasselbe MerkleRootRequested Event beziehen, wurden gefunden und entfernt:\n");
+        console.log("\nAttention. The following MerkleRootUpdated events that refer to the same MerkleRootRequested event were found and removed:\n");
         console.log(removedEvents);
         console.log("\n")
     }
