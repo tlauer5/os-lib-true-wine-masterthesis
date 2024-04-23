@@ -3,7 +3,7 @@ function reportAfterSignatureCheck (requestAndUpdateEvents) {
 
     requestAndUpdateEvents.forEach(event => {
         if (event.type == "MerkleRootUpdated" && event.dataInDatabase && event.signatureCheck === false) {
-            console.log("Signaturcheck for data entry with block number " + event.blockNumber + " invalid.");
+            console.log("Signaturcheck for data entry with block number " + event.blockNumberLeaf + " invalid.");
             allCorrect = false;
         }
     });
@@ -20,7 +20,7 @@ function reportIncorrectLeaves (requestAndUpdateEvents) {
 
         requestAndUpdateEvents.forEach(event => {
             if (event.type == "MerkleRootUpdated" && event.merkleRootCheck === false) {
-                console.log("Signature check for data entry with block number " + event.blockNumber + " invalid.");
+                console.log("Merkle Root check for data entry with block number " + event.blockNumberLeaf + " invalid.");
                 allCorrect = false;
             }
         });
