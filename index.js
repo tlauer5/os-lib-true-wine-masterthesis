@@ -28,55 +28,54 @@ async function verifyIntegrity (data, rpcKey = process.env.RPC_KEY) {
 
         general.providerURL = general.providerURL + rpcKey
         const firstBlockNumberInData = data[0][0]
-        const contract = createContract(general)
+        const contract = createContract(general.providerURL, general.contractAddress, general.abi)
 
         try {
-            // Preprozessierung von Events und Daten
-            console.log("\nLese Events (das Abfragen der Zeitstempel dauert etwas länger)...")
+            // Preprocessing Events and Data
+            console.log("\nRead events and process data...")
             let requestAndUpdateEvents = await organizeEventData(contract, firstBlockNumberInData, general)
 
-            console.log("\nOrdne Events Daten zu...");
             const dataEntries = await dataToEntriesObjects(data)
             await assignDataToEvents([...dataEntries], requestAndUpdateEvents)
 
-            // Überprüfungen
-            console.log("\n-------------\nStarte Überprüfungen:\nChecke Signaturen...")
+            // Checks
+            console.log("\n-------------\n\nCheck signatures...\n")
             await checkSignatures(requestAndUpdateEvents)
             if (reportAfterSignatureCheck(requestAndUpdateEvents)) {
-                console.log("Signaturen korrekt. Führe Überprüfung fort.")
+                console.log("Signatures correct. Continue verification.")
             } else {
-                console.log("Beende Überprüfung\n");
+                console.log("End verification\n");
                 return false;
             }
 
-            console.log("\n-------------\nChecke Merkle Root...");
+            console.log("\n-------------\n\nCheck Merkle Root...\n");
             const merkleRootCheckPassed = await checkMerkleRoot(requestAndUpdateEvents, general, contract)
 
             if (merkleRootCheckPassed) {
-                console.log("Merkle Root identisch. Führe Überprüfung fort.")
+                console.log("Merkle root identical. Continue verification.")
             } else {
                 reportIncorrectLeaves(merkleRootCheckPassed, requestAndUpdateEvents);
                 return false;
             }
 
-            console.log("\n-------------\nChecke Eventreihenfolge...")
+            console.log("\n-------------\n\nCheck event order...")
             checkEventOrder(requestAndUpdateEvents)
 
-            console.log("\nChecke Blocknummern...")
+            console.log("\nCheck block numbers...")
             checkBlockNumbers(requestAndUpdateEvents)
 
-            console.log("\nChecke Zeitstempel...")
+            console.log("\nCheck timestamps...")
             checkTimestamps(requestAndUpdateEvents) //todo verändern damit wirklich zwischen zwei mrreq events und nicht nur nach zwei datenbankeinträgen...
 
             return reportProtocolFidelity(requestAndUpdateEvents)
         } catch (error) {
-            console.log("Folgender Fehler ist in dem Prozess der Verifizierung aufgetreten:\n");
+            console.log("\nThe following error occurred during the verification process:\n");
             console.log(error.message)
-            console.log("\nVerifikation konnte nicht weiter fortgeführt werden.")
+            console.log("\nVerification could not be continued.")
         }
 
     } else {
-        console.log("Keine Daten erhalten. Verifikation kann nicht durchgeführt werden.");
+        console.log("No data received. Verification cannot be performed.");
         return false;
     }
 }

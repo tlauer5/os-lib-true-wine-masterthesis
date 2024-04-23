@@ -3,7 +3,7 @@ function reportAfterSignatureCheck (requestAndUpdateEvents) {
 
     requestAndUpdateEvents.forEach(event => {
         if (event.type == "MerkleRootUpdated" && event.dataInDatabase && event.signatureCheck === false) {
-            console.log("Signaturcheck für Dateneintrag mit Blocknummer: " + event.blockNumber + " ungültig.");
+            console.log("Signaturcheck for data entry with block number " + event.blockNumberLeaf + " invalid.");
             allCorrect = false;
         }
     });
@@ -14,13 +14,13 @@ function reportAfterSignatureCheck (requestAndUpdateEvents) {
 
 function reportIncorrectLeaves (requestAndUpdateEvents) {
     if (merkleRootCheckPassed) {
-        console.log("Merkle Roots stimmen überein. Führe Überprüfung fort.\n");
+        console.log("Merkle roots match. Continue verification.\n");
     } else {
-        console.log("Merkle Roots unterschiedlich. Beende Überprüfung.\n")
+        console.log("Merkle Roots different. Finish review.\n")
 
         requestAndUpdateEvents.forEach(event => {
             if (event.type == "MerkleRootUpdated" && event.merkleRootCheck === false) {
-                console.log("Signaturcheck für Dateneintrag mit Blocknummer: " + event.blockNumber + " ungültig.");
+                console.log("Merkle Root check for data entry with block number " + event.blockNumberLeaf + " invalid.");
                 allCorrect = false;
             }
         });
@@ -42,13 +42,15 @@ function reportProtocolFidelity (requestAndUpdateEvents) {
     const hasInvalidIntervals = intervals.some(interval => !interval.valid);
 
     if (hasInvalidIntervals) {
-        console.log("Folgende Intervalle sind integer: ")
+        console.log("The following intervals have integrity: ")
         console.log(intervals.filter(interval => interval.valid))
-        console.log("\n\nFolgende Intervalle sind nicht integer: ")
+        console.log("\n\nThe following intervals have no integrity: ")
         console.log(intervals.filter(interval => !interval.valid));
         return false
     } else {
-        console.log("Datenintegrität konnte von " + intervals[0].start + " bis " + intervals[intervals.length - 1].end + " verifiziert werden.\n")
+        if(intervals.length != 0) {
+            console.log("\n\nData integrity could be verified from " + convertToBerlinTime(intervals[0].start) + " to " + convertToBerlinTime(intervals[intervals.length - 1].end) + ".")
+        }
         return true
     }
 }
